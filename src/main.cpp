@@ -15,9 +15,9 @@
 #include <boost/range/adaptor/map.hpp>
 #include <random> 
 #include <boost/container/vector.hpp>
-#include <boost/container/stable_vector.hpp>
-#include <boost/container/static_vector.hpp>
-#include <boost/array.hpp>
+//#include <boost/container/stable_vector.hpp>
+//#include <boost/container/static_vector.hpp>
+//#include <boost/array.hpp>
 #include <boost/unordered_map.hpp>
 #include <stdexcept>
 #include <chrono>
@@ -39,7 +39,7 @@ double paso_matrix[max_problem_size][max_problem_size];
 int succ_matrix[max_problem_size][max_problem_size];
 vector<vector<Edge>> sorted_edges;
 int ncities = 0;
-
+double w;
 
 int initial_city = 0;
 int generated_nodes;
@@ -102,7 +102,6 @@ void succ_matrix_caculation() {
 
 vector<int> create_solution(Node_h* candidate) {
 
-	
 	vector<int> solution;
 	solution.push_back(candidate->city);
 	Node_h* parent = candidate->father;
@@ -112,23 +111,19 @@ vector<int> create_solution(Node_h* candidate) {
 	}
 
 	return solution;
-
 }
 
-vector<short> fill_visited_cities(vector<int> solution) {
+vector<short> fill_visited_cities(Node_h* candidate) {
 
-	vector<short> cities;
-	for(unsigned i = 0; i < ncities; ++i) {
-		cities.push_back(0);
-	}
+	vector<short> cities(ncities);
+	cities[candidate->city] = 1;
 	cities[initial_city] = 1;
+	Node_h* parent = candidate->father;
+	while(parent != NULL) {
 
-	if(!solution.empty()) {
-		for(unsigned i = 0; i < solution.size(); ++i) {
-			cities[solution[i]]= 1;
-		}
+		cities[parent->city]= 1;
+		parent = parent->father;
 	}
-
 	return cities;
 }
 
@@ -173,7 +168,7 @@ void sort_edges() {
 
  }
 
- double in_out(short city, vector<int> subtour, vector<short> visited ) {
+double in_out(short city, vector<short> visited ) {
 
    double val = 0.0; 
    int count_a=0, count_b=0;
@@ -202,28 +197,63 @@ void sort_edges() {
 
  }
 
+void get_successors(Node_h* current, vector<short> cities_visited){
 
+	vector<int> v;
+	if(current->father == NULL) {
+		for(short i=0; i<ncities; i++){ 
+			if(i != initial_city) {
+				float h,g,f;
+				//when all cities are visited
+				if(current->depth >= ncities-1){
+					g = current->g + distance_matrix[current->city][i] + distance_matrix[i][initial_city];
+					h = 0;
+					f = g;
 
-double heuristic1(int city,vector<short> cities_visited) 
-{
-  int i;
-  double value=0;
-  for (i=0; i<ncities;i++) 
-    if (i!=city && cities_visited[i]==0)
-      value+=distance_matrix[i][succ_matrix[i][1]]+distance_matrix[i][succ_matrix[i][2]];
+				} else {
+					h = in_out(i,cities_visited);
+					g = current->g + distance_matrix[current->city][i]; 
+					f = (g+h*w)*1000000+h;
+				}
+				Node_h* succ = new Node_h(i,g,h,f,current->depth+1,v,current);
+				//cout<<i<<" ";
+				//print_node(succ,current_solution,cities_visited);
+				generated_nodes++;
+				open.push(succ);
+				current->succs.push_back(i);
+			}
+		}
+	} else {
 
-  
-  for (i=0; i<ncities;i++)
-    if (i!=initial_city && !cities_visited[succ_matrix[initial_city][i]]){
-      value+=distance_matrix[initial_city][succ_matrix[initial_city][i]];
-      break;
-    }
-  
-  return value/2;
+		for(auto &past_succ: current->father->succs){
+			if(current->city != past_succ && past_succ != initial_city){
+				float h,g,f;
+				//when all cities are visited
+				if(current->depth >= ncities-1){
+					g = current->g + distance_matrix[current->city][past_succ] + distance_matrix[past_succ][initial_city];
+					h = 0;
+					f = g;
+
+				} else {
+					h = in_out(past_succ,cities_visited);
+					g = current->g + distance_matrix[current->city][past_succ]; 
+					f = (g+h*w)*1000000+h;
+
+				}
+				Node_h* succ = new Node_h(past_succ,g,h,f,current->depth+1,v,current);
+				//cout<<i<<" ";
+				//print_node(succ,current_solution,cities_visited);
+				generated_nodes++;
+				open.push(succ);
+				current->succs.push_back(past_succ);
+			}
+		}
+	}
+
+	
 }
 
 int aStar(int init_city, double w, int lookahead) {
-
 	
 	int missing_cities = ncities;
 	vector<short> cities_visited;
@@ -231,91 +261,40 @@ int aStar(int init_city, double w, int lookahead) {
 	int iter = 0;
 
 	cout<<"Doing A* search"<<endl;
+	vector<int> v;
+	Node_h* initial_node = new Node_h(init_city,0,0,0,1,v,NULL);
+	open.push(initial_node);
 
-
-	
-	cities_visited = fill_visited_cities(current_solution);
-	
-	Node_h* initial_node = new Node_h(init_city,0,0,0,NULL);
-	// initial_node->h = in_out(initial_city,cities_visited);
-
-	auto prt_open = open.push(initial_node);
-	open_map.emplace(initial_node,prt_open);
 
 	while(!open.empty() && iter < lookahead) {
 
-		
-		//cout<<"open size: "<<open.size()<<endl;
-		Node_h* current = open.top();
-		
-
-		current_solution = create_solution(current);
-		cities_visited = fill_visited_cities(current_solution);
+		Node_h* current = open.top();	
+		cities_visited = fill_visited_cities(current);
 		//cout<<"*****Current node****"<<endl;
 		//print_node(current,current_solution,cities_visited);
 		
-		if(current_solution.size() >= ncities) {
+		if(current->depth >= ncities) {
 			//generate solution report
-			//
-			
+			current_solution = create_solution(current);
 			cout<<"Best solution find (cost): " <<current->g<<endl;
 			cout<<"Best solution find (path): ";
-			for (vector<int>::reverse_iterator i =current_solution.rbegin(); i != current_solution.rend(); ++i ) { 
-				cout<<*i<<" ";
-			} 
+			for (vector<int>::reverse_iterator i =current_solution.rbegin(); i != current_solution.rend(); ++i )
+				cout<<*i<<" "; 
 			cout<<current_solution[ncities-1]<<" ";
 			cout<<endl;
 
-			
 			return 1;
 		}	
 
 		closed.push_back(current);
-		//cout<<"size before: "<<open.size()<<endl;
 		open.pop();
-		//cout<<"size after: "<<open.size()<<endl;
-
-		/*auto node_f = open_map.find(current);
-		open_map.erase(node_f->first);
-		*/
-		missing_cities = ncities - current_solution.size();
-
-
 		expanded_nodes++;
 		
-		//getSuccessors
+		//Successors generation
 		//cout<<"*****SUCCESSORS****"<<endl;
-		for(short i=0; i<ncities; i++){ 
-			if(!cities_visited[i] && i != initial_city) {
-				int succ_id;
-				float h,g,f;
-				//when all cities are visited
-				if(current_solution.size() >= ncities-1){
-					g = current->g + distance_matrix[current->city][i] + distance_matrix[i][initial_city];
-					h = 0;
-					f = g;
-
-				} else {
-					h = in_out(i,current_solution,cities_visited);
-					//h = heuristic1(i,cities_visited);
-
-					g = current->g + distance_matrix[current->city][i]; 
-					f = (g+h*w)*1000000+h;
-
-				}
-				Node_h* succ = new Node_h(i,g,h,f,current);
-				//cout<<i<<" ";
-				//print_node(succ,current_solution,cities_visited);
-				generated_nodes++;
-				open.push(succ);
-			}
-
-		}
-		//cout<<endl; 
+		get_successors(current,cities_visited);
 		iter++;
-		//cin.get();
-
-		
+		//cin.get();	
 	}
 	return -1;
 }
@@ -353,7 +332,7 @@ void search_driver(int lookahead, double w) {
 
 int main(int argc, char const *argv[])
 {
-	double w = 1.0;
+	w = 1.0;
 	int lookahead = 0;
 	ncities = 35;
 	read_problem("../problems/AdaptedFormat/51.mtsp");

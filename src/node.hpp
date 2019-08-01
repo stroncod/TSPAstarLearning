@@ -8,13 +8,14 @@ struct Node_h {
     double g;
     double h;
     double f; // f = g+h
-    //int deph;
-
+    int depth;
+    vector<int> succs;
     Node_h* father;
     boost::any handler_open;
 
     //boost::container::vector<unsigned short> sol;
-    Node_h(int i,double j, double h_, double k, Node_h* l) : city(i),g(j),h(h_),f(k),father(l){}
+    Node_h(int i,double j, double h_, double k, int d ,vector<int> s,Node_h* l) 
+        : city(i),g(j),h(h_),f(k),depth(d),succs(s),father(l){}
    
     ~Node_h(){}
 };
