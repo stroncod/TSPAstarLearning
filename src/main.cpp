@@ -37,6 +37,7 @@ double cities_coor[max_problem_size][2];
 double distance_matrix[MAX_CITIES][MAX_CITIES];
 double paso_matrix[max_problem_size][max_problem_size];
 int succ_matrix[max_problem_size][max_problem_size];
+vector<vector<Edge>> sorted_edges;
 int ncities = 0;
 
 
@@ -151,61 +152,75 @@ void print_node(Node_h* node, vector<int> solution, vector<short> cities ){
 	cout<<endl;
 }
 
-double in_out(Node_h* current, vector<short> subtour) {
+void sort_edges() {
 
-	int interior_cities[MAX_CITIES];
-	double value = 0.0, ini_value = 0, end_value = 0;
-
-	if (current->city == 0) return 0;
-
-	for (int d = 0; d < ncities;d++)
-		interior_cities[d] = 1;
-
-	interior_cities[0] = 0;
-
-	//for (d = parent->id_first_child; d < parent->id_first_child + parent->nchilds; ++d){
-	//	interior_cities[maze1[d][curr_gen].city] = 0;//es 0 la distancia de cualquier ciudad a la actual 
-	//}//ue ctm hace esta wea
-
-	for(unsigned i = 0; i < subtour.size() ; ++i) {
-		interior_cities[subtour[i]] = 0; 
-	}
-	
+	vector<double> v;
+	vector<Edge> edges;
 
 	for(unsigned i = 0; i < ncities; ++i) {
-		int n = 0;
-		if(i != current->city && interior_cities[i] == 0) {
-			for(unsigned j = 0; j < ncities; ++j) {
-				int succ = succ_matrix[i][j];
-				if(interior_cities[succ] == 0) {
-					value += distance_matrix[i][succ];
-					n++;
-					if(n == 2) break; 
-				}
-			}
-		}
-	}
+	 	for(unsigned j = 0; j < ncities; ++j) {
+	 		v.push_back(distance_matrix[i][j]);
 
-	int ini = 1, end = 1;
-	for(unsigned i = 0; i < ncities; ++i) {
-		int succ_ini = succ_matrix[0][i];
-		int succ_end = succ_matrix[current->city][i];
-		if(interior_cities[succ_ini] == 0 && end) {
-			value += distance_matrix[0][succ_ini];
-			ini = 0;
-		}
-		if(interior_cities[succ_end] == 0 && end) {
-			value += distance_matrix[current->city][succ_end];
-			end = 0;
-		}
-		if(!(ini + end)) break;
-	}
+	 	}
+	 	for( auto k: sort_indexes(v) ){
+	 		Edge edge = Edge(v[k],k); 		
+	 		edges.push_back(edge);
+	 	}
+	 	sorted_edges.push_back(edges);
+	 	v.clear();
+	 	edges.clear();
+	 } 
+
+ }
+
+ double in_out(short city, vector<int> subtour, vector<short> visited ) {
+
+   double val = 0.0; 
+   int count_a=0, count_b=0;
+   for(int i=0; i<ncities; i++){ // for the missing cities
+   		
+        if(i != city && !visited[i] ){ //if is not the same city and is not in the subtour
+            int count_a = count_b = 0;
+            while(count_a < 2){
+            	//only for edges who are not connected to an interior node; initial node is never interior
+                if(!visited[sorted_edges[i][count_b].to_city]  || sorted_edges[i][count_b].to_city==initial_city ){
+                	if(sorted_edges[i][count_b].to_city != i) { //eliminate edges with the same nodes in both sides
+                    	val += sorted_edges[i][count_b].cost;
+                    	count_a++;
+                	}
+                    //cout << " - Sumando " << cf[i] << " nodo " << min_edge[cf[i]][count_b].nodo1 << " - Cost: " << min_edge[cf[i]][count_b].cost  << endl;
+                }
+                count_b++;
+                //cin.get();
+            }
+        }   
+    }
+   
+    val += sorted_edges[city][1].cost + sorted_edges[initial_city][1].cost;
+
+    return val*0.5;
+
+ }
 
 
-	return value /2;
 
+double heuristic1(int city,vector<short> cities_visited) 
+{
+  int i;
+  double value=0;
+  for (i=0; i<ncities;i++) 
+    if (i!=city && cities_visited[i]==0)
+      value+=distance_matrix[i][succ_matrix[i][1]]+distance_matrix[i][succ_matrix[i][2]];
+
+  
+  for (i=0; i<ncities;i++)
+    if (i!=initial_city && !cities_visited[succ_matrix[initial_city][i]]){
+      value+=distance_matrix[initial_city][succ_matrix[initial_city][i]];
+      break;
+    }
+  
+  return value/2;
 }
-
 
 int aStar(int init_city, double w, int lookahead) {
 
@@ -222,7 +237,7 @@ int aStar(int init_city, double w, int lookahead) {
 	cities_visited = fill_visited_cities(current_solution);
 	
 	Node_h* initial_node = new Node_h(init_city,0,0,0,NULL);
-	initial_node->h = in_out(initial_node,cities_visited);
+	// initial_node->h = in_out(initial_city,cities_visited);
 
 	auto prt_open = open.push(initial_node);
 	open_map.emplace(initial_node,prt_open);
@@ -236,17 +251,19 @@ int aStar(int init_city, double w, int lookahead) {
 
 		current_solution = create_solution(current);
 		cities_visited = fill_visited_cities(current_solution);
-
+		//cout<<"*****Current node****"<<endl;
 		//print_node(current,current_solution,cities_visited);
 		
 		if(current_solution.size() >= ncities) {
 			//generate solution report
 			//
+			
 			cout<<"Best solution find (cost): " <<current->g<<endl;
 			cout<<"Best solution find (path): ";
-			for(unsigned i = 0; i < current_solution.size(); ++i) {
-				 cout<<current_solution[i]<<" ";
-			}
+			for (vector<int>::reverse_iterator i =current_solution.rbegin(); i != current_solution.rend(); ++i ) { 
+				cout<<*i<<" ";
+			} 
+			cout<<current_solution[ncities-1]<<" ";
 			cout<<endl;
 
 			
@@ -258,9 +275,9 @@ int aStar(int init_city, double w, int lookahead) {
 		open.pop();
 		//cout<<"size after: "<<open.size()<<endl;
 
-		auto node_f = open_map.find(current);
+		/*auto node_f = open_map.find(current);
 		open_map.erase(node_f->first);
-
+		*/
 		missing_cities = ncities - current_solution.size();
 
 
@@ -279,19 +296,22 @@ int aStar(int init_city, double w, int lookahead) {
 					f = g;
 
 				} else {
-					h = in_out(current,cities_visited);
+					h = in_out(i,current_solution,cities_visited);
+					//h = heuristic1(i,cities_visited);
+
 					g = current->g + distance_matrix[current->city][i]; 
-					f = g+h*w;
+					f = (g+h*w)*1000000+h;
+
 				}
 				Node_h* succ = new Node_h(i,g,h,f,current);
-				cout<<i<<" ";
-				//print_node(succ,current_solution);
+				//cout<<i<<" ";
+				//print_node(succ,current_solution,cities_visited);
 				generated_nodes++;
 				open.push(succ);
 			}
 
 		}
-		cout<<endl; 
+		//cout<<endl; 
 		iter++;
 		//cin.get();
 
@@ -304,7 +324,6 @@ int aStar(int init_city, double w, int lookahead) {
 void search_driver(int lookahead, double w) {
 	
 	//add to change search algorithm
-		
 
 		if(lookahead == 0){
 
@@ -336,10 +355,23 @@ int main(int argc, char const *argv[])
 {
 	double w = 1.0;
 	int lookahead = 0;
-	ncities = 51;
+	ncities = 35;
 	read_problem("../problems/AdaptedFormat/51.mtsp");
 	distance_matrix_caculation();
+	/*
+	int values[16] = {0,4,5,15,4,0,12,2,5,12,0,3,15,2,3,0};
+	int k = 0;
+	for(unsigned i = 0; i < ncities; ++i) {
+		for(unsigned j = 0; j < ncities; ++j) {
+
+			distance_matrix[i][j] = values[k];
+			k++;
+		}
+	}
+	*/
 	succ_matrix_caculation();
+	sort_edges();
+
 	expanded_nodes = 0;
 	generated_nodes = 0;
 	search_driver(lookahead,w);
