@@ -220,6 +220,7 @@ void get_successors(Node_h* current, vector<short> cities_visited){
 				//print_node(succ,current_solution,cities_visited);
 				generated_nodes++;
 				open.push(succ);
+				worst_open.push(succ);
 				current->succs.push_back(i);
 			}
 		}
@@ -245,6 +246,7 @@ void get_successors(Node_h* current, vector<short> cities_visited){
 				//print_node(succ,current_solution,cities_visited);
 				generated_nodes++;
 				open.push(succ);
+				worst_open.push(succ);
 				current->succs.push_back(past_succ);
 			}
 		}
@@ -264,6 +266,9 @@ int aStar(int init_city, double w, int lookahead) {
 	vector<int> v;
 	Node_h* initial_node = new Node_h(init_city,0,0,0,1,v,NULL);
 	open.push(initial_node);
+	worst_open.push(initial_node); //do i have to do it?
+	cout<<"size open: "<<open.size()<<endl;
+	cout<<"n expansiones: "<<expanded_nodes<<endl;
 
 
 	while(!open.empty() && iter < lookahead) {
@@ -300,6 +305,20 @@ int aStar(int init_city, double w, int lookahead) {
 }
 
 
+/*
+
+void undo_Astar(int backsteps) {
+
+	for(unsigned i = 0; i < backsteps; ++i) {
+		
+		Node_h* worst = worst_open.top();
+		//tengo que sacarlo de la open tambien
+		//
+	}
+
+}*/
+
+
 void search_driver(int lookahead, double w) {
 	
 	//add to change search algorithm
@@ -334,7 +353,7 @@ int main(int argc, char const *argv[])
 {
 	w = 1.0;
 	int lookahead = 0;
-	ncities = 35;
+	ncities = 51;
 	read_problem("../problems/AdaptedFormat/51.mtsp");
 	distance_matrix_caculation();
 	/*
