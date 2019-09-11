@@ -173,6 +173,7 @@ double in_out(short city, vector<short> visited ) {
 
    double val = 0.0; 
    int count_a=0, count_b=0;
+
    for(int i=0; i<ncities; i++){ // for the missing cities
    		
         if(i != city && !visited[i] ){ //if is not the same city and is not in the subtour
@@ -184,7 +185,6 @@ double in_out(short city, vector<short> visited ) {
                     	val += sorted_edges[i][count_b].cost;
                     	count_a++;
                 	}
-                    //cout << " - Sumando " << cf[i] << " nodo " << min_edge[cf[i]][count_b].nodo1 << " - Cost: " << min_edge[cf[i]][count_b].cost  << endl;
                 }
                 count_b++;
                 //cin.get();
@@ -204,6 +204,35 @@ bool in_closed(Node_h * node ) {
 	return find(closed.begin(),closed.end(),node) != closed.end();
 } 
 
+bool in_open(Node_h * node ){
+	auto it_open = open_map.find(node);
+			
+	if(it_open != open_map.end())  return true;
+
+	return false;
+}
+
+void print_open(){
+	cout<<"open: ";
+	for (auto &i : open )
+	{
+		cout<<"c: "<<i->city<<" h:"<<i->h<<" ";
+	}
+	cout<<endl;
+}
+
+void print_worst(){
+	if(worst_open.size() < 0) {
+		cout<<"Worst is empty"<<endl;
+	} else {
+
+		cout<<"worst: ";
+		for (auto &i : worst_open )
+			cout<<i->city<<" ";
+		cout<<endl;
+	}
+}
+
 void backup(Node_h* current) {
 	double min_f = 0.0;
 	Node_h * parent = current->father;
@@ -220,15 +249,7 @@ void backup(Node_h* current) {
 		backup(parent);
 	}
 
-
 }
-//cada vez que expando, saco a su padre de la worst 
-
-//agregar consistencia de actualizacion en do (LISTO)
-//en worst solo deben estar los nodos que no tengan succ en closed 
-//verificar que la cantidad de backstep sea equivalente al size
-//al ingresar si uno de los hijos del padre esta en closed, lo dejo asi si no tien lo agrego a worst de nuevo
-//actualizo de nuevo cuando lo agrego a la worst (fijandome que sean con los nuevos valores de los hijos)
 
 void get_successors(Node_h* current, vector<short> cities_visited){
 
@@ -246,7 +267,7 @@ void get_successors(Node_h* current, vector<short> cities_visited){
 					f = g;
 
 				} else {
-					h = in_out(i,cities_visited);
+					h = h = in_out(i,cities_visited);
 					g = current->g + distance_matrix[current->city][i]; 
 					f = (g+h*w)*1000000+h;
 				}
@@ -257,8 +278,6 @@ void get_successors(Node_h* current, vector<short> cities_visited){
 
 				if(!in_closed(succ)) {
 					auto prt_open = open.push(succ);
-					auto prt_worst = worst_open.push(succ);
-					worst_map.emplace(succ,prt_worst);
 					open_map.emplace(succ,prt_open);
 					v.push_back(succ);
 				}
@@ -287,52 +306,47 @@ void get_successors(Node_h* current, vector<short> cities_visited){
 					double 	h0 = in_out(past_succ->city,cities_visited);
 
 					h = max((current->h-distance_matrix[current->city][past_succ->city]),h0);
-					//agregar max(h(P)-cost(p,s),h0)
+					//pathmax
 					g = current->g + distance_matrix[current->city][past_succ->city]; 
 					f = (g+h*w)*1000000+h;
 
 				}
-
 				
 				Node_h* succ = new Node_h(past_succ->city,g,h,f,current->depth+1,current);
-				//cout<<i<<" ";
-				//print_node(succ,current_solution,cities_visited);
 				generated_nodes++;
+				auto prt_open = open.push(succ);				
+				open_map.emplace(succ,prt_open);
+				v.push_back(succ);
 
-				if(!in_closed(succ)) {
-					auto prt_open = open.push(succ);
-					auto prt_worst = worst_open.push(succ);
-					worst_map.emplace(succ,prt_worst);
-					open_map.emplace(succ,prt_open);
-					v.push_back(succ);
-				}
 			}
 			current->succs.insert(current->succs.begin(),v.begin(),v.end());
 			v.clear();		
 		}
-
-		
-		/*
-		if(current->h < min_h ) {
-			current->h = min_h;
-			backup(current);
-		}
-		*/
-		//verificar si el h padre < h hijo + costo
-		//cambio h del padre min (h hijo + costo)
-		//hago backup
 	}
 
+
+	auto prt_worst = worst_open.push(current);
+	worst_map.emplace(current,prt_worst);
+
+	auto it_worst = worst_map.find(current->father);
+	
+	if(it_worst != worst_map.end()) {
+
+		worst_open.erase(it_worst->second);
+		
+		worst_map.erase(it_worst->first);
+	}
+	
 	
 }
 
 void init_first_node(){
 
 	vector<Node_h*> v;
-	Node_h* initial_node = new Node_h(initial_city,0,0,0,1,NULL); //modificar init x iteracion
+	Node_h* initial_node = new Node_h(initial_city,0,0,0,1,NULL); 
 	auto prt_open = open.push(initial_node);
-	auto prt_worst = worst_open.push(initial_node);
-	worst_map.emplace(initial_node,prt_worst);
+	//auto prt_worst = worst_open.push(initial_node);
+	//worst_map.emplace(initial_node,prt_worst);
 	open_map.emplace(initial_node,prt_open);
 }
 
@@ -344,17 +358,6 @@ Node_h* aStar(int init_city, double w, int lookahead, int backsteps) {
 	Node_h* current;
 	int iter = 0;
 
-	/*	
-	vector<Node_h*> v;
-	Node_h* initial_node = new Node_h(init_city,0,0,0,1,v,NULL); //modificar init x iteracion
-	auto prt_open = open.push(initial_node);
-	auto prt_worst = worst_open.push(initial_node);
-	worst_map.emplace(initial_node,prt_worst);
-	open_map.emplace(initial_node,prt_open);
-
-	//cout<<"size open: "<<open.size()<<endl;
-	//cout<<"n expansiones: "<<expanded_nodes<<endl;
-	*/
 
 	if(it_driver > 0) lookahead = backsteps;
 
@@ -364,55 +367,21 @@ Node_h* aStar(int init_city, double w, int lookahead, int backsteps) {
 		cout<<"h: "<<current->h<<endl;
 		if(current->father != NULL)
 			cout<<"p: "<<current->father->city<<endl;
-		//cout<<"depth: "<<current->depth<<endl;
+
 
 		cities_visited = fill_visited_cities(current);
-		//cout<<"*****Current node****"<<endl;
-		//print_node(current,current_solution,cities_visited);
-		//cout<<"Hola 2"<<endl;
-		if(current->depth >= ncities) {
-			/*
-			current_solution = create_solution(current);
-			cout<<"Best solution find (cost): " <<current->g<<endl;
-			cout<<"Best solution find (path): ";
-			for (vector<int>::reverse_iterator i =current_solution.rbegin(); i != current_solution.rend(); ++i )
-				cout<<*i<<" "; 
-			cout<<current_solution[ncities-1]<<" ";
-			cout<<endl;
-			*/
-			return current;
-		}
 
-		//cout<<"Hola 3"<<endl;	
-
-
-
+		if(current->depth >= ncities) return current;
 
 		closed.push_back(current);
 		open.pop();
-		worst_open.erase(worst_map[current]);
-		worst_map.erase(current);
 		open_map.erase (current);
 
-		//quitar cuando se elimina de open (revisar que siempre tengan la misma cantidad de elementos) LISTA
 		expanded_nodes++;
 		
-		//Successors generation
-		//cout<<"*****SUCCESSORS****"<<endl;
-		
 		get_successors(current,cities_visited);
-		//cout<<"worst size: "<<worst_open.size()<<endl;
-		//cout<<" open size: "<<open.size()<<endl;
-
-		
-		/*
-		
-		cout<<"open map size: "<<open_map.size()<<endl;
-		cout<<"worst map size: "<<worst_map.size()<<endl;
-		*/
-		//cout<<"size open after succs: "<<open.size()<<endl;
-		
-		//cout<<"n expansiones: "<<iter<<endl;
+		//print_open();
+		//print_worst();
 		cin.get();
 		iter++;	
 	}
@@ -425,80 +394,64 @@ void undo_Astar(int backsteps) {
 
 	double min_h = LARGE;
 
+	if(worst_open.size() < backsteps) backsteps = worst_open.size(); 
+
 	for(unsigned i = 0; i < backsteps; ++i) {
 	
 		Node_h* worst = worst_open.top();
-		//cout<<"id worst: "<<worst<<endl;
-		Node_h* parent = worst->father;
-		//cout<<"id parent: "<<parent<<endl;
-		//eliminarlo de la open tambien 
-		cout<<"p: "<<parent->city<<endl;
+
 		cout<<"w: "<<worst->city<<endl;
-		//cout<<"open size: "<<open.size()<<endl;
-		//cout<<"wort size: "<<worst_open.size()<<endl;
-		//cout<<"open map size: "<<open_map.size()<<endl;
-		//cout<<"worst map size: "<<worst_map.size()<<endl;
-	
-		for (auto &node : parent->succs){
+
+		for (auto &node : worst->succs){
 			
 			cout<<"succ: "<<node->city<<endl;
-			//cout<<"id succ: "<<node
-			//<<endl;
-			auto it_open = open_map.find(node);
 
-			
-			if(it_open != open_map.end()) {
-				//cout<<"entro igual la wea"<<endl;
-				//cout<<it_open->first<<endl;
-				//open.erase(open_map[node]);
-				open.erase(it_open->second);
-				
-				//open_map.erase(node);
-				open_map.erase(it_open->first);
+			if(in_open(node)){
+				open.erase(open_map[node]);
+				open_map.erase(node);
+			}
 
-			}
-			
-			auto it_worst = worst_map.find(node);
-			
-			if(it_worst != worst_map.end()) {
-				worst_open.erase(worst_map[node]);
-				worst_map.erase(it_worst);
-			}
-			//actualizo para todos los succesores en OPEN
-			if (!in_closed(node)) {
-				if((node->h + distance_matrix[parent->city][node->city])< min_h ) 
-					min_h = node->h + distance_matrix[parent->city][node->city];
-			}
+			if((node->h + distance_matrix[worst->city][node->city])< min_h ) 
+				min_h = node->h + distance_matrix[worst->city][node->city];
 
 		}
-		//verificar si el padre esta en open
-		//
-		auto it_parent = open_map.find(parent);
-		if(it_parent != open_map.end()) {	
-			parent->h = max(parent->h,min_h);
-			double f = parent->g + parent->h;
-			parent->f = f; //update the node
-			open.increase(it_parent->second); //update open
-		} else {
-			parent->h = max(parent->h,min_h);
-			auto prt_open = open.push(parent);
-			auto prt_worst = worst_open.push(parent);
-			worst_map.emplace(parent,prt_worst);
-			open_map.emplace(parent,prt_open);
+
+		worst->h =  max(worst->h,min_h);
+		worst->f =  (worst->g+worst->h*w)*1000000+worst->h;
+		auto prt_open = open.push(worst);
+		open_map.emplace(worst,prt_open);
+		closed.erase(remove(closed.begin(), closed.end(), worst), closed.end());
+
+
+		worst_open.pop();
+		int i_succ = 0;
+		min_h = LARGE;
+		for (auto &succ : worst->father->succs){
+			if(in_open(succ)) {
+				//cout<<"entro"<<endl;
+				i_succ++;
+			}
+
+			if((succ->h + distance_matrix[worst->father->city][succ->city])< min_h ) 
+				min_h = succ->h + distance_matrix[worst->father->city][succ->city];
 		}
 
+		if(i_succ == worst->father->succs.size() ){
+			//cout<<"agregando a worst"<<endl;
+			cout<<"wp: "<<worst->father->city<<endl;
+			worst->father->h =  max(worst->h,min_h);
+			cout<<"new wp h: "<<worst->father->h<<endl;
+			cout<<"new w h: "<<worst->h<<endl;
+			worst->father->f =  (worst->g+worst->h*w)*1000000+worst->h;
+			auto prt_worst = worst_open.push(worst->father);
+			worst_map.emplace(worst->father,prt_worst);
+		}
 
-		//busco el padre y quito todos sus hijos que estan en open (y los quito de ambas)
-		// actualizar el h del padre -> h(p) min(h(s)+c(s,p)) entre todos los sucesores (s pertenece a los succ(p))
-		// luego vuelvo a colocar al padre a open y worst
-		// 
-		cin.get();
 	}
 
-
-
-	//cout<<"worst size: "<<worst_open.size()<<endl;
-	//cout<<" open size: "<<open.size()<<endl;
+	//print_worst();
+	//print_open();
+	cin.get();
 
 }
 
@@ -510,9 +463,7 @@ int rm_driver (double w, int lookahead, int backsteps) {
 		cout<<"Doing A* search"<<endl;
 		
 		Node_h* result = aStar(initial_city,w,lookahead, backsteps);
-		//checkforgoal
-		cout<<"worst size: "<<worst_open.size()<<endl;
-		cout<<" open size: "<<open.size()<<endl;
+
 
 		if(result->depth >= ncities) {
 			//generate solution report
@@ -529,8 +480,6 @@ int rm_driver (double w, int lookahead, int backsteps) {
 		cout<<"Undoing A*"<<endl;	
 		undo_Astar(backsteps);
 
-		cout<<"worst size: "<<worst_open.size()<<endl;
-		cout<<" open size: "<<open.size()<<endl;
 		it_driver++;
 	}
 	return -1;
@@ -576,10 +525,10 @@ int main(int argc, char const *argv[])
 	int lookahead = stoi(argv[2]);
 	cout<<"l:" <<lookahead<<endl;
 	int backsteps = stoi(argv[3]);
-	ncities = 14;
+	ncities = 4;
 	read_problem("../problems/AdaptedFormat/14.mtsp");
 	distance_matrix_caculation();
-	/*
+	
 	int values[16] = {0,4,5,15,4,0,12,2,5,12,0,3,15,2,3,0};
 	int k = 0;
 	for(unsigned i = 0; i < ncities; ++i) {
@@ -589,7 +538,7 @@ int main(int argc, char const *argv[])
 			k++;
 		}
 	}
-	*/
+	
 	succ_matrix_caculation();
 	sort_edges();
 
