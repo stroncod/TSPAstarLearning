@@ -58,9 +58,7 @@ vector<size_t> sort_indexes(const vector<T> &v) {
 typedef fibonacci_heap<Node_h*,compare<compare_states> >::handle_type open_handle;
 typedef fibonacci_heap<Node_h*,compare<compare_worst> >::handle_type worst_handle;
 fibonacci_heap<Node_h*, boost::heap::compare<compare_states> > open;
-fibonacci_heap<Node_h*, boost::heap::compare<compare_worst> > worst_open;
 boost::unordered_map<Node_h*, open_handle> open_map;
-boost::unordered_map<Node_h*, worst_handle> worst_map;
 boost::container::vector<Node_h*> closed;
 
 
