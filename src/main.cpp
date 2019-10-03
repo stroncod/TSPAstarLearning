@@ -407,10 +407,14 @@ void undo_Astar(int backsteps) {
 			
 			//cout<<"succ: "<<node->city<<endl;
 
+			/*
 			if(in_open(node)){
 				open.erase(open_map[node]);
 				open_map.erase(node);
-			}
+			}*/
+
+			open.erase(open_map[node]);
+			open_map.erase(node);
 
 			if((node->h + distance_matrix[to_removed->city][node->city])< min_h ) 
 				min_h = node->h + distance_matrix[to_removed->city][node->city];
@@ -436,12 +440,25 @@ void undo_Astar(int backsteps) {
 
 
 int rm_driver (double w, int lookahead, int backsteps) {
-
+	double a_times = 0; 
+	double u_times = 0; 
+	int flag = 0;
+	chrono::high_resolution_clock::time_point a_start;
+	chrono::high_resolution_clock::time_point a_end;
+	chrono::duration<double> a_time_span;
 	init_first_node();
 	while(1) {
+		if(it_driver > 0) {
+			a_start = chrono::high_resolution_clock::now();
+		}
 		cout<<"Doing A* search"<<endl;
 		
 		Node_h* result = aStar(initial_city,w,lookahead, backsteps);
+		if(flag) {
+			a_end = chrono::high_resolution_clock::now();
+			a_time_span = chrono::duration_cast<chrono::duration<double>>(a_end-a_start);
+			a_times+=a_time_span.count();
+		}
 
 
 		if(result->depth >= ncities) {
@@ -453,12 +470,20 @@ int rm_driver (double w, int lookahead, int backsteps) {
 				cout<<*i<<" "; 
 			cout<<final_solution[ncities-1]<<" ";
 			cout<<endl;
+			cout<<"Avg Astar Time: "<<a_times/it_driver-1<<endl;
+			cout<<"Avg Undo Time: "<<u_times/it_driver<<endl;
 
 			return 1;
 		}
-		cout<<"Undoing A*"<<endl;	
-		undo_Astar(backsteps);
+		cout<<"Undoing A*"<<endl;
 
+		flag = 1;
+		chrono::high_resolution_clock::time_point u_start = chrono::high_resolution_clock::now();
+		undo_Astar(backsteps);
+		chrono::high_resolution_clock::time_point u_end = chrono::high_resolution_clock::now();
+		chrono::duration<double> u_time_span = chrono::duration_cast<chrono::duration<double>>(u_end-u_start);
+		u_times+=u_time_span.count();
+		
 		it_driver++;
 	}
 	return -1;
@@ -504,8 +529,8 @@ int main(int argc, char const *argv[])
 	int lookahead = stoi(argv[2]);
 	cout<<"l:" <<lookahead<<endl;
 	int backsteps = stoi(argv[3]);
-	ncities = 29;
-	read_problem("../problems/AdaptedFormat/29.mtsp");
+	ncities = 51;
+	read_problem("../problems/AdaptedFormat/51.mtsp");
 	distance_matrix_caculation();
 	/*
 	int values[16] = {0,4,5,15,
