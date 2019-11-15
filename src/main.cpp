@@ -237,8 +237,9 @@ void print_open(){
 
 
 void backup(Node_h* current) {
+	'doing backup'
 	double min_f = 0.0;
-	Node_h * parent = current->father;
+	Node_h * parent = current->parent;
 	if(parent != NULL) {
 		for(auto &past_succ: parent->succs){
 			if(min_f < past_succ->f) {
