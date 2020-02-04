@@ -45,6 +45,7 @@ int initial_city = 0;
 int generated_nodes;
 int expanded_nodes;
 int local_expanded;
+int local_generated;
 int it_driver;
 
 void read_problem(const char *filename) {
@@ -236,25 +237,6 @@ void print_open(){
 }
 
 
-void backup(Node_h* current) {
-	'doing backup'
-	double min_f = 0.0;
-	Node_h * parent = current->parent;
-	if(parent != NULL) {
-		for(auto &past_succ: parent->succs){
-			if(min_f < past_succ->f) {
-				min_f = past_succ->f;
-			}
-		}
-
-		if(parent->h < min_f) {
-			parent->h = min_f;
-		}
-		backup(parent);
-	}
-
-}
-
 void get_successors(Node_h* current, vector<short> cities_visited){
 
 	//al generar estados tengo que revisar que no esten en closed 
@@ -278,8 +260,9 @@ void get_successors(Node_h* current, vector<short> cities_visited){
 				Node_h* succ = new Node_h(i,g,h,f,current->depth+1,current);
 				//cout<<i<<" ";
 				//print_node(succ,current_solution,cities_visited);
+				local_generated++;
 				generated_nodes++;
-
+				
 				if(!in_closed(succ)) {
 					auto prt_open = open.push(succ);
 					open_map.emplace(succ,prt_open);
@@ -321,6 +304,7 @@ void get_successors(Node_h* current, vector<short> cities_visited){
 				
 				Node_h* succ = new Node_h(past_succ->city,g,h,f,current->depth+1,current);
 				generated_nodes++;
+				local_generated++;
 				auto prt_open = open.push(succ);				
 				open_map.emplace(succ,prt_open);
 				v.push_back(succ);
@@ -345,18 +329,16 @@ void init_first_node(){
 
 Node_h* aStar(int init_city, double w, int lookahead, int backsteps) {
 
+
+	if(it_driver > 0) lookahead = backsteps+local_generated;
 	local_expanded = 0; 
-	
+	local_generated = 0;
 	int missing_cities = ncities;
 	vector<short> cities_visited;
 	vector<int> current_solution;
 	Node_h* current;
-
-
-
-	if(it_driver > 0) lookahead = backsteps;
-
-	while(!open.empty() && local_expanded < lookahead) {
+	
+	while(!open.empty() && local_generated < lookahead) {
 		current = open.top();
 		//cout<<"c: "<<current->city<<endl;
 		//cout<<"h: "<<current->h<<endl;
@@ -440,26 +422,18 @@ void undo_Astar(int backsteps) {
 }
 
 
-int rm_driver (double w, int lookahead, int backsteps) {
-	double a_times = 0; 
-	double u_times = 0; 
+Node_h* rm_driver (double w, int lookahead, int backsteps) {
+
 	int flag = 0;
 	chrono::high_resolution_clock::time_point a_start;
 	chrono::high_resolution_clock::time_point a_end;
 	chrono::duration<double> a_time_span;
 	init_first_node();
 	while(1) {
-		if(it_driver > 0) {
-			a_start = chrono::high_resolution_clock::now();
-		}
 		cout<<"Doing A* search"<<endl;
 		
 		Node_h* result = aStar(initial_city,w,lookahead, backsteps);
-		if(flag) {
-			a_end = chrono::high_resolution_clock::now();
-			a_time_span = chrono::duration_cast<chrono::duration<double>>(a_end-a_start);
-			a_times+=a_time_span.count();
-		}
+
 
 
 		if(result->depth >= ncities) {
@@ -471,29 +445,41 @@ int rm_driver (double w, int lookahead, int backsteps) {
 				cout<<*i<<" "; 
 			cout<<final_solution[ncities-1]<<" ";
 			cout<<endl;
-			cout<<"Avg Astar Time: "<<a_times/it_driver-1<<endl;
-			cout<<"Avg Undo Time: "<<u_times/it_driver<<endl;
 
-			return 1;
+
+			return result;
 		}
 		cout<<"Undoing A*"<<endl;
 
-		flag = 1;
-		chrono::high_resolution_clock::time_point u_start = chrono::high_resolution_clock::now();
+
+
 		undo_Astar(backsteps);
-		chrono::high_resolution_clock::time_point u_end = chrono::high_resolution_clock::now();
-		chrono::duration<double> u_time_span = chrono::duration_cast<chrono::duration<double>>(u_end-u_start);
-		u_times+=u_time_span.count();
+
 		
 		it_driver++;
 	}
-	return -1;
+	return NULL;
+}
+
+bool fileExists(std::string& fileName) {
+    return static_cast<bool>(std::ifstream(fileName));
 }
 
 
 void search_driver(int lookahead, double w, int backsteps) {
 	
 	//add to change search algorithm
+		string filename = "resultsRMAstar.csv";
+		ofstream log_file;
+		
+		if(!fileExists(filename)) {
+			cout<<"file not found. creating"<<endl;
+			log_file.open (filename, std::ios::out | std::ios::app);
+			log_file <<"ncities,w,memory,backstep,CostFound,Time,Expanded,Generated,Driver_iter" <<"\n";
+		} else {
+			cout<<"success "<<filename <<" found. \n";
+			log_file.open (filename, std::ios::out | std::ios::app);
+		}
 
 		if(lookahead == 0){
 
@@ -503,15 +489,18 @@ void search_driver(int lookahead, double w, int backsteps) {
 
 		chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
 		//int sol_response = aStar(initial_city,w,lookahead);
-		int sol_response = rm_driver(w,lookahead,backsteps);
+		Node_h* sol_response = rm_driver(w,lookahead,backsteps);
 		chrono::high_resolution_clock::time_point end = chrono::high_resolution_clock::now();
 
-		if(sol_response != -1){
+		if(sol_response != NULL){
+
 			chrono::duration<double> time_span = chrono::duration_cast<chrono::duration<double>>(end-start);
 			cout<<"Resolution Time: "<<time_span.count()<<endl;
 			cout<<"Expanded Nodes: "<<expanded_nodes<<endl;
 			cout<<"Generated Nodes: "<<generated_nodes<<endl;
 			cout<<"Driver Iterations: "<<it_driver+1<<endl;
+			log_file <<ncities<<","<<w<<","<<lookahead<<","<<backsteps<<","<<sol_response->g<<","<<time_span.count()<<","<<expanded_nodes<<","<<generated_nodes<<","<<it_driver<<"\n"; 
+         	log_file.close();
 		} else {
 			cout<<"No solution found!"<<endl;
 		}
@@ -530,14 +519,15 @@ int main(int argc, char const *argv[])
 	int lookahead = stoi(argv[2]);
 	cout<<"l:" <<lookahead<<endl;
 	int backsteps = stoi(argv[3]);
-	ncities = 51;
-	read_problem("../problems/AdaptedFormat/51.mtsp");
+	ncities = stoi(argv[4]);
+	string filename = to_string(ncities) + ".mtsp";
+	read_problem(("problems/AdaptedFormat/"+filename).c_str());
 	distance_matrix_caculation();
 	/*
 	int values[16] = {0,4,5,15,
 					  4,0,12,2,
 					  5,12,0,3,
-					  15,2,3,0};
+					  15,2,3,0};å
 	int k = 0;
 	for(unsigned i = 0; i < ncities; ++i) {
 		for(unsigned j = 0; j < ncities; ++j) {
